@@ -1,0 +1,10 @@
+{
+  "name": "traix",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TETRIX ARENA · 联网对战俄罗斯方块（Rust 服务端 + H5 前端）",
+  "scripts": {
+    "test": "node tools/simtest.mjs"
+  }
+}

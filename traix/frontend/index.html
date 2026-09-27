@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<meta name="theme-color" content="#0b1020" />
+<title>TETRIX ARENA · 联网对战俄罗斯方块</title>
+<link rel="stylesheet" href="./css/style.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">TETRIX<span>ARENA</span></div>
+    <div class="roomchip" id="roomChip" hidden>
+      <span class="k">房间</span><span class="v" id="roomCode">----</span>
+      <button class="tiny" id="copyRoom" title="复制房间号">复制</button>
+    </div>
+    <div class="netstatus" id="netStatus"><i class="dot"></i><span id="netText">未连接</span></div>
+  </header>
+
+  <!-- ================= 大厅 ================= -->
+  <section id="lobbyView">
+    <div class="hero">
+      <h1>锁定步 · 干扰行对战</h1>
+      <p>双方共享<strong>完全相同的方块掉落序列</strong>；你每消掉一行，对手最底层就会多出一行<strong>带固定缺口</strong>的干扰行，把他的方块整体上推。</p>
+    </div>
+
+    <div class="lobbyGrid">
+      <div class="card">
+        <label class="field">
+          <span>昵称</span>
+          <input id="nameInput" maxlength="12" placeholder="输入你的昵称" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span>房间号</span>
+          <input id="codeInput" maxlength="8" placeholder="留空则随机开房" autocomplete="off" />
+        </label>
+        <div class="row">
+          <button class="btn primary" id="joinBtn">进入房间</button>
+          <button class="btn" id="randomBtn">随机开房</button>
+        </div>
+        <p class="hint" id="lobbyHint">同一房间号的两个人会自动配对。想本地测试？开两个浏览器标签页，输入同一个房间号即可。</p>
+      </div>
+
+      <div class="card rules">
+        <h3>规则</h3>
+        <ul>
+          <li><b>相同序列</b>：双方第 n 个方块永远是同一种形状，由服务端一次性生成下发。</li>
+          <li><b>固定缺口</b>：干扰行缺口也来自服务端下发的一条固定序列，双方完全一致。</li>
+          <li><b>消行即攻击</b>：消 1 行 = 对手收到 1 行干扰行（消 2 行给 2 行，依此类推）。</li>
+          <li><b>上推</b>：收到干扰行时，对手已有方块整体上移一行；被顶出顶端的方块会让该方直接落败。</li>
+          <li><b>胜负</b>：任意一方顶出（新方块无处生成 / 被干扰行顶出）即输。</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 对战 ================= -->
+  <section id="gameView" hidden>
+    <aside class="side">
+      <div class="who">
+        <span class="name" id="themName">对手</span>
+        <span class="badge" id="themBadge">连接中</span>
+      </div>
+      <canvas id="boardThem" class="board them"></canvas>
+      <div class="chiprow">
+        <span class="chip">消行 <b id="themLines">0</b></span>
+        <span class="chip">收到 <b id="themRecv">0</b></span>
+      </div>
+    </aside>
+
+    <div class="center">
+      <div class="who me">
+        <span class="name" id="meName">我</span>
+        <span class="badge" id="meBadge">准备中</span>
+      </div>
+      <canvas id="boardMe" class="board me"></canvas>
+      <div class="chiprow">
+        <span class="chip good">发出 <b id="mySent">0</b></span>
+        <span class="chip">收到 <b id="myRecv">0</b></span>
+        <span class="chip">同步 <b id="syncState">--</b></span>
+      </div>
+    </div>
+
+    <aside class="side right">
+      <div class="panelTitle">下一个</div>
+      <canvas id="nextCanvas" class="next"></canvas>
+      <div class="panelTitle">统计</div>
+      <div class="statlist">
+        <div><span>消行</span><b id="myLines">0</b></div>
+        <div><span>等级</span><b id="myLevel">1</b></div>
+        <div><span>Tetris</span><b id="myTetris">0</b></div>
+        <div><span>回滚</span><b id="myRewind">0</b></div>
+      </div>
+      <button class="btn ghost" id="leaveBtn">离开房间</button>
+      <div class="keys">
+        <div class="panelTitle">按键</div>
+        <p>← → 移动 · ↓ 加速下落<br/>↑ / X 顺时针 · Z 逆时针<br/>空格 硬降</p>
+      </div>
+    </aside>
+  </section>
+
+  <!-- 准备条 -->
+  <div class="readybar" id="readyBar" hidden>
+    <span id="readyText">等待对手加入…</span>
+    <button class="btn primary" id="readyBtn" disabled>我准备好了</button>
+  </div>
+
+  <!-- 触屏控制 -->
+  <div class="touch" id="touchPad" hidden>
+    <button class="tb" data-act="L">◀</button>
+    <button class="tb" data-act="W">↺</button>
+    <button class="tb" data-act="C">↻</button>
+    <button class="tb" data-act="R">▶</button>
+    <button class="tb wide" data-act="S">▼ 加速</button>
+    <button class="tb" data-act="H">⤓ 硬降</button>
+  </div>
+
+  <div class="overlay" id="overlay" hidden>
+    <div class="dialog">
+      <h2 id="ovTitle">对局结束</h2>
+      <p id="ovText"></p>
+      <div class="row">
+        <button class="btn primary" id="againBtn">再来一局</button>
+        <button class="btn" id="ovLeaveBtn">回到大厅</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" hidden></div>
+</div>
+
+<script type="module" src="./js/main.js"></script>
+</body>
+</html>
